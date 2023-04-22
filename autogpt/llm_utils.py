@@ -10,6 +10,8 @@ from openai.error import APIError, RateLimitError
 from autogpt.config import Config
 from autogpt.logs import logger
 
+import requests
+
 CFG = Config()
 
 openai.api_key = CFG.openai_api_key
@@ -73,15 +75,25 @@ def create_chat_completion(
     num_retries = 10
     warned_user = False
     if CFG.debug_mode:
+        # print(
+        #     Fore.GREEN
+        #     + f"Creating chat completion with model {model}, temperature {temperature},"
+        #     f" max_tokens {max_tokens}" + Fore.RESET
+        # )
+
         print(
             Fore.GREEN
-            + f"Creating chat completion with model {model}, temperature {temperature},"
+            + f"Creating chat completion with model Vicuna-7B q4, temperature {temperature},"
             f" max_tokens {max_tokens}" + Fore.RESET
         )
+
+    # print(messages)
+
     for attempt in range(num_retries):
         backoff = 2 ** (attempt + 2)
         try:
             if CFG.use_azure:
+                print (111)
                 response = openai.ChatCompletion.create(
                     deployment_id=CFG.get_azure_deployment_id_for_model(model),
                     model=model,
@@ -90,12 +102,35 @@ def create_chat_completion(
                     max_tokens=max_tokens,
                 )
             else:
-                response = openai.ChatCompletion.create(
-                    model=model,
-                    messages=messages,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                )
+                
+                # print (model)
+                # print (messages)
+                # print (max_tokens)
+                # print (temperature)
+
+                # response = openai.ChatCompletion.create(
+                #     model=model,
+                #     messages=messages,
+                #     temperature=0.7,
+                #     max_tokens=512,
+                # )
+
+                url = 'http://localhost:443/v1/chat/completions'
+
+                payload = {
+                    "model": "gpt-3.5-turbo",
+                    "messages": messages 
+                }
+
+                headers = {
+                    'Authorization': 'Bearer /home/nero/code/llama.cpp/models/vicuna-7b/ggml-model-q4_0.bin',
+                    'Content-Type': 'application/json'
+                }
+
+                response = requests.post(url, json=payload, headers=headers).json()
+
+                # print(response)
+
             break
         except RateLimitError:
             if CFG.debug_mode:
@@ -135,7 +170,8 @@ def create_chat_completion(
         else:
             quit(1)
 
-    return response.choices[0].message["content"]
+    # return response.choices[0].message["content"]
+    return response["choices"][0]["message"]["content"]
 
 
 def create_embedding_with_ada(text) -> list:
